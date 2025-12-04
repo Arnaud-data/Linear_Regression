@@ -1,0 +1,847 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage[french]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage[most]{tcolorbox}
+\usepackage{graphicx}
+\graphicspath{{./}{image/}}
+\usepackage{microtype}
+\usepackage{setspace}
+\setstretch{1.15}
+\usepackage[parfill]{parskip}
+\usepackage{float}
+\setlength{\parskip}{0.8em}
+\setlength{\parindent}{0pt} 
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{lmodern}
+\usepackage[most]{tcolorbox}
+\usepackage[table]{xcolor}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{changepage}
+\usepackage{blindtext}
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=20mm,
+ top=20mm,
+ }
+\usepackage{listings}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    citecolor=black,
+    filecolor=black
+}
+
+
+
+\title{Régression Linéaire Python}
+
+\author{Aldj Souleïman \\ Buccafurri Arnaud \\ Gaillot Solène \\
+        \small M1 Économétrie-Statistiques - Paris 1 Panthéon-Sorbonne
+}
+\date{Novembre 2025}
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+\noindent Dans ce projet, nous avons construit un programme Python qui génère une régression linéaire. Ce document s'articule autour de trois parties : une première avec notre code qui génère la régression, une seconde où l'on test les différentes fonction puis une troisième qui présente trois exemples d'applications.\end{abstract} 
+\vspace{3cm}
+\begin{center}
+    \includegraphics[scale=0.1]{image/Python.jpg}
+\end{center}
+
+\newpage
+\tableofcontents
+\newpage
+\section{Code}
+\begin{lstlisting}
+import numpy as np
+import pandas as pd
+from typing import List, Tuple
+
+
+class DataSet:
+    """
+    Stores a feature matrix, a target vector, and their column names.
+    Adds an intercept to the feature matrix and converts the data into
+    pandas DataFrames with a train/test split.
+    """
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        features_name: List[str],
+        target_name: List[str]
+    ) -> None:
+        """
+        Initializes the DataSet instance and reshapes the target vector
+        into a column vector.
+
+        Parameters:
+            X : np.ndarray.
+            y : np.ndarray.
+            features_name : List[str].
+            target_name : List[str].
+
+        Returns:
+            None.
+        """
+
+        self.X = X
+        self.y = y.reshape(-1, 1)
+        self.features_name = features_name
+        self.target_name = target_name
+
+    def add_intercept(self) -> None:
+        """
+        Raises an error if there is a dimension mismatch between X and y
+        Adds a column of ones as the first column of the feature matrix (X).
+        Also adds the name "intercept" at the beginning of the feature names list.
+
+        Returns:
+            None.
+        """
+        if self.X.shape[0] != self.y.shape[0]:
+            raise ValueError("X and y must have the same number of rows")
+
+        intercept = np.ones((self.X.shape[0], 1))
+        self.X = np.concatenate((intercept, self.X), axis=1)
+        self.features_name = ["intercept"] + self.features_name
+
+    def turn_into_dataframe(
+        self,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Converts the feature matrix (X) and the target vector (y)
+        into four pandas DataFrames using an 80/20 train–test split.
+
+        Returns:
+            X_train : pd.DataFrame.
+            y_train : pd.DataFrame.
+            X_test : pd.DataFrame.
+            y_test : pd.DataFrame.
+        """
+
+        df_X = pd.DataFrame(self.X, columns=self.features_name)
+        df_y = pd.DataFrame(self.y, columns=self.target_name)
+
+        cutoff = int(len(self.X) * 0.8)
+        X_train = df_X.iloc[:cutoff]
+        y_train = df_y.iloc[:cutoff]
+        X_test = df_X.iloc[cutoff:]
+        y_test = df_y.iloc[cutoff:]
+
+        return X_train, y_train, X_test, y_test
+
+
+
+
+class LinearRegression:
+    """
+    Stores the feature names and model coefficients, and implements
+    Ordinary Least Squares (OLS) regression using the closed-form
+    normal equation. Includes methods for fitting the model on training
+    data and predicting target values for unseen samples (test data).
+    """
+
+    def __init__(self, features_name: List[str]) -> None:
+        """
+        Initializes the LinearRegression instance.
+
+        Parameters:
+            features_name : List[str].
+
+        Returns:
+            None.
+        """
+        self.coeficients = None
+        self.features_name = features_name
+
+    def fit_model(
+        self,
+        X_train: pd.DataFrame,
+        y_train: pd.DataFrame
+    ) -> np.ndarray:
+        """
+        Fits the OLS model on the training data
+        and returns predictions for the training set.
+        Raises an error if the features matrix is not invertible.
+
+        Parameters:
+            X_train : pd.DataFrame.
+            y_train : pd.DataFrame.
+
+        Returns:
+            y_pred : np.ndarray.
+        """
+        X = X_train.values
+        y = y_train.values
+        X_t = X.T
+
+        try:
+            self.coeficients = np.linalg.inv(X_t @ X) @ X_t @ y
+        except np.linalg.LinAlgError as error:
+            raise np.linalg.LinAlgError(
+                "Matrix X cannot be inverted."
+                "Check for multicollinearity or duplicate features."
+            ) from error
+
+        y_pred = X @ self.coeficients
+        return y_pred
+
+    def predict_model(self, X_test: pd.DataFrame) -> np.ndarray:
+        """
+        Predicts target values for new samples (test data).
+        Raises an error if predict is called before the model has been fitted.
+
+        Parameters:
+            X_test : pd.DataFrame.
+
+        Returns:
+            y_pred : np.ndarray.
+        """
+
+        if self.coeficients is None:
+            raise ValueError("Model has not been fitted yet")
+
+        X = X_test.values
+        y_pred = X @ self.coeficients
+        return y_pred
+
+    def to_dict(self) -> Dict[str, float]:
+        """
+        Returns the coefficients as a dictionary mapping
+        each feature name to its associated coefficient.
+
+        Returns:
+            coefficients : Dict[str, float].
+        """
+
+        coefficients = {}
+        for i in range(self.coeficients.shape[0]):
+            coefficients[self.features_name[i]] = float(
+                round(self.coeficients[i, 0], 3)
+            )
+        return coefficients
+
+
+
+
+class Result:
+    """
+    Stores a fitted linear regression model with the true and predicted
+    values for both training and test sets. Computes evaluation metrics such as
+    R², MSE, and RMSE for model assessment.
+    """
+
+    def __init__(
+        self,
+        model: LinearRegression,
+        y_train: pd.DataFrame,
+        y_pred_train: np.ndarray,
+        y_test: pd.DataFrame,
+        y_pred_test: np.ndarray
+    ) -> None:
+        """
+        Initializes the Result instance.
+
+        Parameters:
+            model : LinearRegression.
+            y_train : pd.DataFrame.
+            y_pred_train : np.ndarray.
+            y_test : pd.DataFrame.
+            y_pred_test : np.ndarray.
+
+        Returns:
+            None.
+        """
+
+        self.model = model
+        self.R2 = None
+        self.y_train = y_train.values
+        self.y_pred_train = y_pred_train
+        self.y_test = y_test.values
+        self.y_pred_test = y_pred_test
+
+    def get_r2(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """
+        Computes the R².
+
+        Parameters:
+            y_true : np.ndarray.
+            y_pred : np.ndarray.
+
+        Returns:
+            R2 : float.
+        """
+
+        scr = float(np.sum((y_true - y_pred) ** 2))
+        sct = float(np.sum((y_true - np.mean(y_true)) ** 2))
+        R2 = 1 - (scr / sct)
+        return R2
+
+    def calculate_error(
+        self,
+        y_true: np.ndarray,
+        y_pred: np.ndarray
+    ) -> Tuple[float, float]:
+        """
+        Computes the Mean Squared Error (MSE) and Root Mean Squared Error (RMSE).
+
+        Parameters:
+            y_true : np.ndarray.
+            y_pred : np.ndarray.
+
+        Returns:
+            mse : float.
+            rmse : float.
+        """
+
+        mse = float(np.mean((y_true - y_pred)**2))
+        rmse = float(np.sqrt(mse))
+        return mse, rmse
+
+    def results(self) -> str:
+        """
+        Generates a summary of the model performance, including
+        coefficients, R², MSE, and RMSE for both training and test sets.
+
+        Returns:
+            A summary string containing:
+            - coefficients,
+            - train R² and test R²,
+            - train MSE and RMSE,
+            - test MSE and RMSE.
+        """
+
+        r2_train = self.get_r2(self.y_train, self.y_pred_train)
+        r2_test = self.get_r2(self.y_test, self.y_pred_test)
+
+        mse_train, rmse_train = self.calculate_error(
+            self.y_train, self.y_pred_train
+        )
+        mse_test, rmse_test = self.calculate_error(
+            self.y_test, self.y_pred_test
+        )
+
+        return (
+            f"Model coefficients: {self.model.to_dict()}.\n"
+            f"Train R²: {round(r2_train, 3)}.\n"
+            f"Test R²: {round(r2_test, 3)}.\n"
+            f"Train RMSE: {round(rmse_train, 3)} (MSE={round(mse_train, 3)}).\n"
+            f"Test RMSE: {round(rmse_test, 3)} (MSE={round(mse_test, 3)})."
+        )
+
+
+
+
+
+def main(X: np.ndarray,
+         y: np.ndarray,
+         features_name: list[str],
+         target_name: list[str]) -> None:
+    """
+    Runs the full regression on user-provided data:
+    - builds the dataset object,
+    - adds an intercept column,
+    - converts data into train/test DataFrames,
+    - fits a linear regression model,
+    - generates predictions,
+    - computes evaluation metrics and prints a summary.
+
+    Parameters:
+        X : numpy.ndarray of shape (n_samples, n_features).
+        y : numpy.ndarray of shape (n_samples,) or (n_samples, 1).
+        features_name : list of str.
+        target_name : list of str.
+
+    Returns:
+        None.
+    """
+
+    data = DataSet(X, y, features_name, target_name)
+    data.add_intercept()
+
+
+    X_train, y_train, X_test, y_test = data.turn_into_dataframe()
+
+    model = LinearRegression(data.features_name)
+    y_pred_train = model.fit_model(X_train, y_train)
+    y_pred_test = model.predict_model(X_test)
+
+    result = Result(model, y_train, y_pred_train, y_test, y_pred_test)
+    print(result.results())
+
+
+from sklearn.datasets import make_regression
+
+
+"""X, y = make_regression(
+        n_samples=15000,
+        n_features=3,
+        random_state=42,
+        noise=50
+)"""
+X = np.random.randn(100, 2)
+y = np.random.randn(99)
+features_name = ["X1", "X2"]
+target_name = ["y"]
+
+main(X, y, features_name, target_name)
+\end{lstlisting}
+\newpage
+\section{Tests}
+\subsection{class DataSet}
+\begin{lstlisting}
+#Class DataSet
+def test_dataset_initializes_properly():
+    X = np.random.randn(5, 2)
+    y = np.random.randn(5)
+    features_name = ["X1", "X2"]
+    target_name = ["y"]
+
+    ds = DataSet(X, y, features_name, target_name)
+
+    assert ds.X.shape == (5, 2)
+    assert ds.y.shape == (5, 1)
+    assert ds.features_name == ["X1", "X2"]
+    assert ds.target_name == ["y"]
+
+
+def test_raises_error_on_dimension_mismatch():
+    X = np.random.randn(100, 2)
+    y = np.random.randn(99)
+
+    try:
+        ds = DataSet(X, y, ["X1", "X2"], ["y"])
+        ds.add_intercept()
+        assert False, "ValueError was not raised"
+    except ValueError as error:
+        assert str(error) == "X and y must have the same number of rows"
+
+
+def test_add_intercept():
+    X = np.random.randn(5, 2)
+    y = np.random.randn(5)
+
+    ds = DataSet(X, y, ["X1", "X2"], ["y"])
+    ds.add_intercept()
+
+    assert ds.X.shape == (5, 3)
+    assert np.all(ds.X[:, 0] == 1)
+    assert ds.features_name[0] == "intercept"
+
+
+def test_turn_into_dataframe():
+    X = np.random.randn(10, 2)
+    y = np.random.randn(10)
+
+    ds = DataSet(X, y, ["X1", "X2"], ["y"])
+    X_train, y_train, X_test, y_test = ds.turn_into_dataframe()
+
+    assert len(X_train) == 8
+    assert len(X_test) == 2
+    assert len(y_train) == 8
+    assert len(y_test) == 2
+    assert type(X_train) == pd.DataFrame
+    assert type(X_test) == pd.DataFrame
+    assert type(y_train) == pd.DataFrame
+    assert type(y_test) == pd.DataFrame
+
+\end{lstlisting}
+\newpage
+\subsection{class LinearRegression}
+\begin{lstlisting}
+
+#Class LinearRegression
+def test_linearregression_initializes_properly():
+    model = LinearRegression(["X1", "X2"])
+
+    assert model.features_name == ["X1", "X2"]
+    assert model.coeficients is None
+
+
+def test_fit_model_raises_error_when_matrix_not_invertible():
+    X = pd.DataFrame([[1, 2], [2, 4]], columns=["X1", "X2"])
+    y = pd.DataFrame([[3], [6]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+
+    try:
+        model.fit_model(X, y)
+        assert False, "np.linalg.LinAlgError was not raised"
+    except np.linalg.LinAlgError:
+        assert True
+
+
+def test_fit_model_coefficients():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    model.fit_model(X, y)
+
+    assert model.coeficients.shape == (2, 1)
+    assert type(model.coeficients) == np.ndarray
+    assert round(model.coeficients[0,0],0) == 2
+    assert round(model.coeficients[1,0],0) == -1
+
+
+def test_fit_model_prediction():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    y_pred = model.fit_model(X, y)
+
+    assert y_pred.shape == (3, 1)
+    assert type(y_pred) == np.ndarray
+    for i in range(len(y_pred)):
+        assert round(y_pred[i,0], 0) == y.iloc[i,0]
+
+
+def test_predict_model():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    model.fit_model(X, y)
+    y_pred = model.predict_model(X)
+
+    assert y_pred.shape == (3, 1)
+    assert type(y_pred) == np.ndarray
+
+
+def test_predict_before_fit_raises_error():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    model = LinearRegression(["X1", "X2"])
+
+    try:
+        model.predict_model(X)
+        assert False, "ValueError was not raised"
+    except ValueError as error:
+        assert str(error) == "Model has not been fitted yet"
+
+
+def test_to_dict():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    model.fit_model(X, y)
+    d = model.to_dict()
+
+    assert type(d) == dict
+    assert set(d.keys()) == {"X1", "X2"}
+    for v in d.values():
+        assert type(v) == float
+    assert d["X1"] == 2
+    assert d["X2"] == -1
+\end{lstlisting}
+\newpage
+\subsection{class Result}
+\begin{lstlisting}
+
+#Class LinearRegression
+def test_linearregression_initializes_properly():
+    model = LinearRegression(["X1", "X2"])
+
+    assert model.features_name == ["X1", "X2"]
+    assert model.coeficients is None
+
+
+def test_fit_model_raises_error_when_matrix_not_invertible():
+    X = pd.DataFrame([[1, 2], [2, 4]], columns=["X1", "X2"])
+    y = pd.DataFrame([[3], [6]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+
+    try:
+        model.fit_model(X, y)
+        assert False, "np.linalg.LinAlgError was not raised"
+    except np.linalg.LinAlgError:
+        assert True
+
+
+def test_fit_model_coefficients():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    model.fit_model(X, y)
+
+    assert model.coeficients.shape == (2, 1)
+    assert type(model.coeficients) == np.ndarray
+    assert round(model.coeficients[0,0],0) == 2
+    assert round(model.coeficients[1,0],0) == -1
+
+
+def test_fit_model_prediction():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    y_pred = model.fit_model(X, y)
+
+    assert y_pred.shape == (3, 1)
+    assert type(y_pred) == np.ndarray
+    for i in range(len(y_pred)):
+        assert round(y_pred[i,0], 0) == y.iloc[i,0]
+
+
+def test_predict_model():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    model.fit_model(X, y)
+    y_pred = model.predict_model(X)
+
+    assert y_pred.shape == (3, 1)
+    assert type(y_pred) == np.ndarray
+
+
+def test_predict_before_fit_raises_error():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    model = LinearRegression(["X1", "X2"])
+
+    try:
+        model.predict_model(X)
+        assert False, "ValueError was not raised"
+    except ValueError as error:
+        assert str(error) == "Model has not been fitted yet"
+
+
+def test_to_dict():
+    X = pd.DataFrame([[1,2], [1,3], [2,0]], columns=["X1", "X2"])
+    y = pd.DataFrame([[0], [-1], [4]], columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    model.fit_model(X, y)
+    d = model.to_dict()
+
+    assert type(d) == dict
+    assert set(d.keys()) == {"X1", "X2"}
+    for v in d.values():
+        assert type(v) == float
+    assert d["X1"] == 2
+    assert d["X2"] == -1
+
+
+
+
+#Class Result
+def test_result_initializes_properly():
+    model = LinearRegression(["X1", "X2"])
+    y_train = pd.DataFrame([[1], [2], [3]])
+    y_pred_train = np.array([[1], [2], [3]])
+    y_test = pd.DataFrame([[4], [5]])
+    y_pred_test = np.array([[4], [5]])
+
+    result = Result(model, y_train, y_pred_train, y_test, y_pred_test)
+
+    assert type(result.model) == LinearRegression
+    assert (result.y_train == y_train.values).all()
+    assert (result.y_pred_train == y_pred_train).all()
+    assert (result.y_test == y_test.values).all()
+    assert (result.y_pred_test == y_pred_test).all()
+
+
+def test_get_r2_correct_calculation():
+    y_true = np.array([1, 2, 3]).reshape(-1, 1)
+    y_pred = np.array([1, 2, 3]).reshape(-1, 1)
+
+    result = Result(None, pd.DataFrame(y_true), y_pred, pd.DataFrame(y_true), y_pred)
+    r2 = result.get_r2(y_true, y_pred)
+
+    assert r2 == 1.0
+
+
+def test_get_r2_correct_value():
+    X, y = make_regression(n_samples=1000, n_features=2, noise=1, random_state=42)
+    X = pd.DataFrame(X, columns=["X1", "X2"])
+    y = pd.DataFrame(y, columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    y_pred = model.fit_model(X, y)
+    result = Result(model, y, y_pred, y, y_pred)
+    R2 = result.get_r2(y.values, y_pred)
+
+    assert 0 <= R2 <= 1
+
+
+def test_calculate_error():
+    y_true = np.array([1, 2, 3]).reshape(-1, 1)
+    y_pred = np.array([1, 2, 3]).reshape(-1, 1)
+
+    result = Result(None, pd.DataFrame(y_true), y_pred, pd.DataFrame(y_true), y_pred)
+    mse, rmse = result.calculate_error(y_true, y_pred)
+
+    assert mse == 0.0
+    assert rmse == 0.0
+
+
+def test_results():
+    X, y = make_regression(n_samples=100, n_features=2, noise=10, random_state=42)
+    X = pd.DataFrame(X, columns=["X1", "X2"])
+    y = pd.DataFrame(y, columns=["y"])
+
+    model = LinearRegression(["X1", "X2"])
+    y_pred = model.fit_model(X, y)
+    result = Result(model, y, y_pred, y, y_pred)
+    output = result.results()
+
+    assert type(output) == str
+    assert "Model coefficients" in output
+    assert "Train R²" in output
+    assert "Test R²" in output
+    assert "Train RMSE" in output
+    assert "Test RMSE" in output
+\end{lstlisting}
+\newpage
+\section{Application}
+\subsection{Calcul du coefficient d'aversion au risque}
+En utilisant l'équation de Markowitz :
+\begin{equation}
+    U = \mathbb{E}(R_f) - 0.5\cdot A\cdot\sigma^2_f
+\end{equation}
+\begin{enumerate}
+    \item $U$ l'utilité de cet investissement par rapport à un taux sans risque
+    \item $\mathbb{E}(R_f)$ l'espérence de rendement du portefeuille
+    \item $A$ l'aversion au risque qui est le coefficient que l'on cherche à estimer
+    \item $\sigma^2_f$ la volatilité du portefeuille
+\end{enumerate}
+On pose ainsi le modèle suivant :
+\begin{equation}
+    U_i = \alpha + \beta_1\mathbb{E}(R_f) +\beta_2\sigma^2_i + \epsilon_i
+\end{equation}
+En mettant ce modèle sous forme matricielle, on obtient :
+\begin{equation}
+    U = X\beta + \epsilon
+\end{equation}
+$$
+X = \begin{bmatrix}
+| & | & | \\
+1 &\mathbb{E}(R_f) & \sigma^2_f\\
+| & | & |
+\end{bmatrix} \hspace{1cm} 
+\beta = \begin{bmatrix}
+\alpha \\
+\beta_1 \\
+\beta_2
+\end{bmatrix}
+$$
+En générent des données pseudos-aléatoire, la régression nous donne :
+\begin{center}
+    \includegraphics[scale=0.8]{image/resultat_coef_risque.png}
+\end{center}
+On remarque ici que $\hat{\beta_2} = -1,752$ et on sait que $\hat{\beta_2} = -\frac{1}{2}\hat{A}$. On en déduit donc que $\hat{A} = 3,504$. \\\\
+Remarque : On a ici générer $(\epsilon_i)_{1\leq i \leq n} \underset{i.i.d.}\sim \mathcal{N}(0,0.02)$ 
+\newpage
+\subsection{Nombre de visite chez le medecin}
+Dans cette exemple on s'intéresse au nombre de visite chez le médecin en fonction du sexe, de l'âge et du revenu. On a ainsi le modèle suivant :
+\begin{equation}
+    nb\_visite_i = \alpha + \beta_1\cdot sexe_i + \beta_2 \cdot age_i + \beta_3\cdot salaire_i + \epsilon_i
+\end{equation}
+Ce qui revient matriciellement au modèle suivant :
+\begin{equation}
+    Y = X\beta + \epsilon
+\end{equation}
+$$
+X = \begin{bmatrix}
+| & | & | & | \\
+1 & sexe & age & salaire \\
+| & | & | & |
+\end{bmatrix} \hspace{1cm} 
+\beta = \begin{bmatrix}
+\alpha \\
+\beta_1 \\
+\beta_2 \\
+\beta_3
+\end{bmatrix}
+$$
+On a $sexe_i$ une indicatrice qui vaut 1 si l'individu est une femme et 0 sinon. En estimant ce modèle par MCO, on obtient :
+\begin{center}
+    \includegraphics[scale=0.8]{image/Nbr_visite.png}
+\end{center}
+\newpage
+\subsection{Écart de revenus homme femme}
+Nous nous intéressons ici au revenu en fonction du sexe, de l'âge, de l'expérience, de l'éducation et du secteur . On a ainsi le modèle suivant :
+\begin{equation}
+    salaire_i = \alpha + \beta_1\cdot sexe_i + \beta_2 \cdot age_i + \beta_3\cdot edu_i + \beta_4\cdot exp_i + \beta_5\cdot secteur_i + \epsilon_i
+\end{equation}
+Ce qui revient matriciellement au modèle suivant :
+\begin{equation}
+    Y = X\beta + \epsilon
+\end{equation}
+$$
+X = \begin{bmatrix}
+| & | & | & | & | & |\\
+1 & sexe & age & edu & exp & secteur\\
+| & | & | & | & | & |
+\end{bmatrix} \hspace{1cm} 
+\beta = \begin{bmatrix}
+\alpha \\
+\beta_1 \\
+\beta_2 \\
+\beta_3 \\
+\beta_4 \\
+\beta_5 
+\end{bmatrix}
+$$
+En entrant des données pseudo- aléatoire dans notre modèle, on obtient le résultat suivant :
+\begin{center}
+    \includegraphics[scale=0.67]{image/ecart_h_f.png}
+\end{center}
+\newpage
+\subsection{DATA}
+Dans l'ensemble de ces exemples d'applications, les données sont des données générer de manière à coller plus ou moins avec la réalité. Les variables que l'on cherche à expliquer on été construite comme la somme des varaible expliqué ajouté a un bruit.
+Afin d'illustrer cette génération de données voici la génération de donnée du nombre de visite chez le médecin :
+\begin{lstlisting}
+np.random.seed(42)
+n = 70
+
+# Sexe
+Sexe = np.random.choice(["Homme", "Femme"], size=n)
+
+# Age
+Age = np.random.randint(22, 61, size=n)
+
+# Salaire
+Salaire = np.random.randint(10, 200, size=n)
+
+
+# Nombre de visite annuelle
+Nombre_visite = (0.5 + np.where(Sexe=="Femme",1,0) + 0.08*Age + 0.01*Salaire + np.random.normal(0, 3, n))  # bruit
+Nombre_visite = np.where(Nombre_visite < 0, 0, Nombre_visite)
+Nombre_visite = np.round(Nombre_visite, 0)
+
+# Creer DataFrame
+df = pd.DataFrame({
+    "Sexe": Sexe,
+    "Salaire": Salaire,
+    "Nombre_visite": np.round(Nombre_visite, 0)
+})
+Sexe = np.where(Sexe == "Femme", 1, 0) 
+X = np.column_stack((Sexe, Age, Salaire))
+
+
+features_name = ['Sexe', 'Age', 'Salaire']
+target_name = ['Nombre de visite']
+\end{lstlisting}
+De manière à coller aux hypothèses des MCO, nottament celle de normalité des résdus, nous avons générer les epsilons de manière à ce qu'ils suivent une loi normal centrée.
+\begin{equation}
+    (\epsilon_t)_{1\le i \le n}\underset{i.i.d.}\sim \mathcal{N}(0,\sigma^2)
+\end{equation}
+
+
+\end{document}
