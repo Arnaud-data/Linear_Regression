@@ -42,15 +42,13 @@ def main(X: np.ndarray,
 
 
 
-"""X, y = make_regression(
+X, y = make_regression(
         n_samples=15000,
         n_features=3,
         random_state=42,
         noise=50
-)"""
-X = np.random.randn(100, 2)
-y = np.random.randn(99)
-features_name = ["X1", "X2"]
+)
+features_name = ["X1", "X2", "X3"]
 target_name = ["y"]
 
 main(X, y, features_name, target_name)
