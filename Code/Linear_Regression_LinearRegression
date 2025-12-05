@@ -58,7 +58,7 @@ class LinearRegression:
     def predict_model(self, X_test: pd.DataFrame) -> np.ndarray:
         """
         Predicts target values for new samples (test data).
-        Raises an error if predict is called before the model has been fitted.
+        Raises an error if predict_model is called before the model has been fitted.
 
         Parameters:
             X_test : pd.DataFrame.
