@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 class DataSet:
     """
-    Stores a feature matrix, a target vector, and their column names.
+    Stores a feature matrix (X), a target vector (y), and their column names.
     Adds an intercept to the feature matrix and converts the data into
     pandas DataFrames with a train/test split.
     """
@@ -39,7 +39,7 @@ class DataSet:
     def add_intercept(self) -> None:
         """
         Raises an error if there is a dimension mismatch between X and y
-        Adds a column of ones as the first column of the feature matrix (X).
+        Adds a column of ones as the first column of the feature matrix.
         Also adds the name "intercept" at the beginning of the feature names list.
 
         Returns:
